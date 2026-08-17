@@ -11,6 +11,11 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const { autoUpdater } = electronUpdater
 
 let win: BrowserWindow | null = null
+
+function sendToWindow(channel: string, ...args: unknown[]): void {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, ...args)
+}
+
 let client: AcpClient | null = null
 let permRequestId = 0
 const pendingPermissions = new Map<number, (optionId: string) => void>()
@@ -39,6 +44,10 @@ function createWindow(): void {
   win.once('ready-to-show', () => {
     win?.maximize()
     win?.show()
+  })
+
+  win.on('closed', () => {
+    win = null
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -77,7 +86,7 @@ function setupAutoUpdater(): void {
 
   autoUpdater.on('update-downloaded', async (info) => {
     const notes = await fetchChangelog(info.version)
-    win?.webContents.send('kiro:updateReady', { version: info.version, notes })
+    sendToWindow('kiro:updateReady', { version: info.version, notes })
   })
 
   autoUpdater.on('error', (err) => {
@@ -106,20 +115,20 @@ app.whenReady().then(() => {
     client = new AcpClient()
 
     client.on('notification', (method, params) => {
-      win?.webContents.send('kiro:notification', { method, params })
+      sendToWindow('kiro:notification', { method, params })
     })
     client.on('stderr', (chunk: string) => {
-      win?.webContents.send('kiro:stderr', chunk)
+      sendToWindow('kiro:stderr', chunk)
     })
     client.on('exit', (code: number | null) => {
-      win?.webContents.send('kiro:exit', code)
+      sendToWindow('kiro:exit', code)
     })
     client.onIncomingRequest(async (method, params) => {
       if (method === 'session/request_permission') {
         const id = ++permRequestId
         const decision = await new Promise<string>((resolve) => {
           pendingPermissions.set(id, resolve)
-          win?.webContents.send('kiro:permissionRequest', { id, params })
+          sendToWindow('kiro:permissionRequest', { id, params })
         })
         const option = params.options.find((o: any) => o.optionId === decision) ?? params.options[0]
         return { outcome: { outcome: 'selected', optionId: option.optionId } }

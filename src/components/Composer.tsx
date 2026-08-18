@@ -30,6 +30,7 @@ function ModelSelector({
 }) {
   const [open, setOpen] = useState(false)
   const [hoverInfo, setHoverInfo] = useState<string | null>(null)
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -74,19 +75,25 @@ function ModelSelector({
               <span className="model-selector__name">{m.name}</span>
               <span
                 className="model-selector__info"
-                onMouseEnter={() => setHoverInfo(m.modelId)}
+                onMouseEnter={(e) => {
+                  setHoverInfo(m.modelId)
+                  setHoverPos({ x: e.clientX, y: e.clientY })
+                }}
+                onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
                 onMouseLeave={() => setHoverInfo(null)}
                 onClick={(e) => e.stopPropagation()}
               >
                 <InfoIcon width={12} height={12} />
-                {hoverInfo === m.modelId && (
-                  <span className="model-selector__tooltip">
-                    {m.modelId === 'auto' ? AUTO_DESCRIPTION : m.description ?? 'Sem descrição disponível.'}
-                  </span>
-                )}
               </span>
             </div>
           ))}
+        </div>
+      )}
+      {hoverInfo && hoverPos && (
+        <div className="model-selector__desc-float" style={{ left: hoverPos.x + 14, top: hoverPos.y }}>
+          {hoverInfo === 'auto'
+            ? AUTO_DESCRIPTION
+            : (models.find((m) => m.modelId === hoverInfo)?.description ?? 'Sem descrição disponível.')}
         </div>
       )}
     </div>

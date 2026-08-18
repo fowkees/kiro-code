@@ -13,6 +13,10 @@ declare global {
       openInExplorer(path: string): Promise<void>
       extractPdfText(path: string): Promise<string>
       getDefaultFolder(): Promise<string>
+      getAppVersion(): Promise<string>
+      sendFeedback(message: string): Promise<{ ok: boolean }>
+      getSettings(): Promise<import('./types').AppSettings>
+      setSettings(partial: Partial<import('./types').AppSettings>): Promise<import('./types').AppSettings>
       getStartupFolder(): Promise<string>
       restartToUpdate(): Promise<void>
       onUpdateReady(cb: (version: string, notes: string[]) => void): () => void
@@ -24,6 +28,9 @@ declare global {
       onNotification(cb: (method: string, params: any) => void): () => void
       onPermissionRequest(cb: (id: number, params: any) => void): () => void
       onExit(cb: (code: number | null) => void): () => void
+      onBrowserNavigate(cb: (url: string) => void): () => void
+      onBrowserExec(cb: (id: number, action: string, params: any) => void): () => void
+      sendBrowserExecResult(id: number, result: any): void
     }
   }
 }

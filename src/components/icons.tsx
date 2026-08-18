@@ -103,6 +103,63 @@ export function InfoIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ArrowLeftIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M19 12H5M5 12l6-6M5 12l6 6" />
+    </Icon>
+  )
+}
+
+export function RefreshIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 12a9 9 0 0 1 15.3-6.4M21 12a9 9 0 0 1-15.3 6.4" />
+      <path d="M18 3v4h-4M6 21v-4h4" />
+    </Icon>
+  )
+}
+
+export function FeedbackSparkleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" {...props}>
+      <path
+        d="M12 2.5c.6 2.7 1.3 4.4 2.3 5.4 1 1 2.7 1.7 5.4 2.3-2.7.6-4.4 1.3-5.4 2.3-1 1-1.7 2.7-2.3 5.4-.6-2.7-1.3-4.4-2.3-5.4-1-1-2.7-1.7-5.4-2.3 2.7-.6 4.4-1.3 5.4-2.3 1-1 1.7-2.7 2.3-5.4Z"
+        fill="url(#feedback-sparkle-grad)"
+      />
+      <path
+        d="M19 15.2c.3 1.2.6 2 1.1 2.5.5.5 1.3.8 2.5 1.1-1.2.3-2 .6-2.5 1.1-.5.5-.8 1.3-1.1 2.5-.3-1.2-.6-2-1.1-2.5-.5-.5-1.3-.8-2.5-1.1 1.2-.3 2-.6 2.5-1.1.5-.5.8-1.3 1.1-2.5Z"
+        fill="url(#feedback-sparkle-grad)"
+      />
+      <defs>
+        <linearGradient id="feedback-sparkle-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#fd9c3d" />
+          <stop offset="45%" stopColor="#fd3d9c" />
+          <stop offset="100%" stopColor="#b03dfd" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </Icon>
+  )
+}
+
+export function GlobeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9s1.3-6.3 3.8-9Z" />
+    </Icon>
+  )
+}
+
 export function PanelLeftIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

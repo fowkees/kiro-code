@@ -1,4 +1,4 @@
-import { DragEvent, useEffect, useRef, useState } from 'react'
+import { DragEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import TopBar from './components/TopBar'
@@ -6,10 +6,13 @@ import Composer, { ComposerHandle } from './components/Composer'
 import ToolCallCard from './components/ToolCallCard'
 import PermissionModal from './components/PermissionModal'
 import Sidebar from './components/Sidebar'
+import BrowserPanel from './components/BrowserPanel'
+import SettingsModal from './components/SettingsModal'
+import FeedbackModal from './components/FeedbackModal'
 import UpdateModal from './components/UpdateModal'
 import ImageLightbox from './components/ImageLightbox'
 import { FileIcon, PaperclipIcon } from './components/icons'
-import { Attachment, Block, ModelInfo, PermissionRequest, SessionSummary } from './types'
+import { AppSettings, Attachment, Block, ModelInfo, PermissionRequest, SessionSummary } from './types'
 
 function extractText(content: any): string {
   if (content == null) return ''
@@ -23,6 +26,20 @@ function extractText(content: any): string {
 let uid = 0
 const nextId = () => `b${++uid}`
 
+const FONT_SIZE_PX: Record<AppSettings['fontSize'], string> = {
+  small: '13px',
+  medium: '14px',
+  large: '16px'
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace('#', '')
+  const r = parseInt(m.slice(0, 2), 16)
+  const g = parseInt(m.slice(2, 4), 16)
+  const b = parseInt(m.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 export default function App() {
   const [cwd, setCwd] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
@@ -34,6 +51,9 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(264)
+  const resizingSidebar = useRef(false)
+  const sidebarRef = useRef<HTMLElement>(null)
   const [contextUsage, setContextUsage] = useState<number | null>(null)
   const [creditsUsed, setCreditsUsed] = useState(0)
   const [creditsUnit, setCreditsUnit] = useState('créditos')
@@ -41,6 +61,13 @@ export default function App() {
   const [showUpdateModal, setShowUpdateModal] = useState(false)
   const [hasExchanged, setHasExchanged] = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [settings, setSettingsState] = useState<AppSettings | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [browserWidth, setBrowserWidth] = useState(420)
+  const resizingBrowser = useRef(false)
+  const browserPanelRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const autoConnectStarted = useRef(false)
   const composerRef = useRef<ComposerHandle>(null)
@@ -61,7 +88,21 @@ export default function App() {
       .getStartupFolder()
       .then((folder) => connectTo(folder))
       .catch((err) => console.error('Falha ao abrir a pasta inicial:', err))
+    window.kiro.getSettings().then(setSettingsState)
   }, [])
+
+  useEffect(() => {
+    if (!settings) return
+    const root = document.documentElement.style
+    root.setProperty('--accent', settings.accentColor)
+    root.setProperty('--accent-soft', hexToRgba(settings.accentColor, 0.15))
+    root.setProperty('--chat-font-size', FONT_SIZE_PX[settings.fontSize])
+  }, [settings])
+
+  async function updateSettings(partial: Partial<AppSettings>) {
+    const next = await window.kiro.setSettings(partial)
+    setSettingsState(next)
+  }
 
   useEffect(() => {
     const offNotif = window.kiro.onNotification((method, params) => {
@@ -173,8 +214,23 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    const el = scrollRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 150) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    }
   }, [blocks])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [activeSessionId])
+
+  useEffect(() => {
+    return window.kiro.onBrowserNavigate(() => setBrowserOpen(true))
+  }, [])
 
   async function connectTo(folder: string) {
     const { sessionResult } = await window.kiro.start(folder)
@@ -284,6 +340,57 @@ export default function App() {
     if (e.dataTransfer.files.length > 0) composerRef.current?.addFiles(e.dataTransfer.files)
   }
 
+  function startSidebarResize(e: ReactMouseEvent) {
+    e.preventDefault()
+    resizingSidebar.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    let lastWidth = sidebarWidth
+
+    function onMove(ev: MouseEvent) {
+      if (!resizingSidebar.current) return
+      lastWidth = Math.min(480, Math.max(200, ev.clientX))
+      if (sidebarRef.current) sidebarRef.current.style.width = `${lastWidth}px`
+    }
+    function onUp() {
+      resizingSidebar.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setSidebarWidth(lastWidth)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  function startBrowserResize(e: ReactMouseEvent) {
+    e.preventDefault()
+    resizingBrowser.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.body.classList.add('resizing-browser-panel')
+    let lastWidth = browserWidth
+
+    function onMove(ev: MouseEvent) {
+      if (!resizingBrowser.current) return
+      const maxWidth = Math.max(280, window.innerWidth - 380)
+      lastWidth = Math.min(maxWidth, Math.max(280, window.innerWidth - ev.clientX))
+      if (browserPanelRef.current) browserPanelRef.current.style.width = `${lastWidth}px`
+    }
+    function onUp() {
+      resizingBrowser.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.body.classList.remove('resizing-browser-panel')
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setBrowserWidth(lastWidth)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   function restartToUpdate() {
     window.kiro.restartToUpdate()
   }
@@ -333,7 +440,9 @@ export default function App() {
       <Sidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
+        width={sidebarWidth}
         collapsed={sidebarCollapsed}
+        panelRef={sidebarRef}
         onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
         onNewChat={onNewChat}
         onOpenSession={onOpenSession}
@@ -341,13 +450,19 @@ export default function App() {
         onRenameSession={renameSession}
         onDeleteSession={deleteSession}
         onOpenInExplorer={(path) => window.kiro.openInExplorer(path)}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenFeedback={() => setShowFeedback(true)}
       />
+
+      {!sidebarCollapsed && <div className="sidebar-resize-handle" onMouseDown={startSidebarResize} />}
 
       <div className="main-column">
         <TopBar
           title={activeTitle}
           folderLabel={folderLabel}
           updateVersion={updateReady?.version ?? null}
+          browserOpen={browserOpen}
+          onToggleBrowser={() => setBrowserOpen((v) => !v)}
           onOpenUpdate={() => setShowUpdateModal(true)}
         />
 
@@ -457,6 +572,15 @@ export default function App() {
         />
       </div>
 
+      {browserOpen && <div className="browser-resize-handle" onMouseDown={startBrowserResize} />}
+
+      <BrowserPanel
+        visible={browserOpen}
+        width={browserWidth}
+        panelRef={browserPanelRef}
+        onClose={() => setBrowserOpen(false)}
+      />
+
       {permissionRequest && <PermissionModal request={permissionRequest} onChoose={choosePermission} />}
 
       {updateReady && showUpdateModal && (
@@ -469,6 +593,12 @@ export default function App() {
       )}
 
       {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+
+      {showSettings && settings && (
+        <SettingsModal settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+      )}
+
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
     </div>
   )
 }

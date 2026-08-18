@@ -125,14 +125,14 @@ export class AcpClient extends EventEmitter {
     })
   }
 
-  async newSession(cwd: string): Promise<any> {
-    const result = await this.request('session/new', { cwd, mcpServers: [] })
+  async newSession(cwd: string, mcpServers: any[] = []): Promise<any> {
+    const result = await this.request('session/new', { cwd, mcpServers })
     this.sessionId = result.sessionId
     return result
   }
 
-  async loadSession(cwd: string, sessionId: string): Promise<any> {
-    const result = await this.request('session/load', { sessionId, cwd, mcpServers: [] })
+  async loadSession(cwd: string, sessionId: string, mcpServers: any[] = []): Promise<any> {
+    const result = await this.request('session/load', { sessionId, cwd, mcpServers })
     this.sessionId = sessionId
     return result
   }

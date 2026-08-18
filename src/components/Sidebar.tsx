@@ -1,10 +1,19 @@
-import { KeyboardEvent, useEffect, useState } from 'react'
+import { KeyboardEvent, RefObject, useEffect, useState } from 'react'
 import { SessionSummary } from '../types'
 import { dayGroup } from '../lib/time'
 import { getPinned, togglePinned } from '../lib/pinned'
 import SessionMenu from './SessionMenu'
 import ConfirmDialog from './ConfirmDialog'
-import { CircleIcon, FolderIcon, MoreHorizontalIcon, PanelLeftIcon, PinIcon, PlusIcon } from './icons'
+import {
+  CircleIcon,
+  FeedbackSparkleIcon,
+  FolderIcon,
+  MoreHorizontalIcon,
+  PanelLeftIcon,
+  PinIcon,
+  PlusIcon,
+  SettingsIcon
+} from './icons'
 
 interface MenuState {
   sessionId: string
@@ -15,18 +24,24 @@ interface MenuState {
 export default function Sidebar({
   sessions,
   activeSessionId,
+  width,
   collapsed,
+  panelRef,
   onToggleCollapsed,
   onNewChat,
   onOpenSession,
   onOpenFolder,
   onRenameSession,
   onDeleteSession,
-  onOpenInExplorer
+  onOpenInExplorer,
+  onOpenSettings,
+  onOpenFeedback
 }: {
   sessions: SessionSummary[]
   activeSessionId: string | null
+  width: number
   collapsed: boolean
+  panelRef: RefObject<HTMLElement>
   onToggleCollapsed: () => void
   onNewChat: () => void
   onOpenSession: (session: SessionSummary) => void
@@ -34,6 +49,8 @@ export default function Sidebar({
   onRenameSession: (sessionId: string, title: string) => void
   onDeleteSession: (sessionId: string) => void
   onOpenInExplorer: (cwd: string) => void
+  onOpenSettings: () => void
+  onOpenFeedback: () => void
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -47,7 +64,7 @@ export default function Sidebar({
 
   if (collapsed) {
     return (
-      <aside className="sidebar sidebar--collapsed">
+      <aside className="sidebar sidebar--collapsed" ref={panelRef}>
         <button className="sidebar__rail-btn" title="Expandir barra lateral" onClick={onToggleCollapsed}>
           <PanelLeftIcon width={17} height={17} />
         </button>
@@ -57,6 +74,13 @@ export default function Sidebar({
         </button>
         <button className="sidebar__rail-btn" title="Abrir pasta…" onClick={onOpenFolder}>
           <FolderIcon width={17} height={17} />
+        </button>
+        <div className="sidebar__rail-spacer" />
+        <button className="sidebar__rail-btn" title="Sugerir uma melhoria" onClick={onOpenFeedback}>
+          <FeedbackSparkleIcon width={15} height={15} />
+        </button>
+        <button className="sidebar__rail-btn" title="Configurações" onClick={onOpenSettings}>
+          <SettingsIcon width={16} height={16} />
         </button>
       </aside>
     )
@@ -152,7 +176,7 @@ export default function Sidebar({
   const activeMenuSession = sessions.find((s) => s.sessionId === menu?.sessionId)
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width }} ref={panelRef}>
       <div className="sidebar__toprow">
         <button className="sidebar__rail-btn" title="Recolher barra lateral" onClick={onToggleCollapsed}>
           <PanelLeftIcon width={16} height={16} />
@@ -188,6 +212,15 @@ export default function Sidebar({
             {items.map(renderItem)}
           </div>
         ))}
+      </div>
+
+      <div className="sidebar__footer">
+        <button className="sidebar__footer-btn" title="Sugerir uma melhoria" onClick={onOpenFeedback}>
+          <FeedbackSparkleIcon width={14} height={14} />
+        </button>
+        <button className="sidebar__footer-btn" title="Configurações" onClick={onOpenSettings}>
+          <SettingsIcon width={15} height={15} />
+        </button>
       </div>
 
       {menu && activeMenuSession && (

@@ -36,6 +36,13 @@ export interface ModelInfo {
   description?: string
 }
 
+export interface AppSettings {
+  accentColor: string
+  defaultFolder: string | null
+  browserAutoApprove: boolean
+  fontSize: 'small' | 'medium' | 'large'
+}
+
 export interface SessionSummary {
   sessionId: string
   cwd: string

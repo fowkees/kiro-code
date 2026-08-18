@@ -6,7 +6,15 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AcpClient } from './acp'
 import { deleteSession, listSessions, readTranscript, renameSession } from './sessions'
-import { getLastFolder, setLastFolder } from './state'
+import { getLastFolder, getSettings, setLastFolder, setSettings } from './state'
+import {
+  BROWSER_MCP_NAME,
+  getBrowserMcpServerConfig,
+  onBrowserNavigate,
+  setBrowserExecHandler,
+  setConsoleSource,
+  startBrowserMcpServer
+} from './browserMcp'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const { autoUpdater } = electronUpdater
@@ -38,7 +46,8 @@ function createWindow(): void {
     },
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
-      sandbox: false
+      sandbox: false,
+      webviewTag: true
     }
   })
 
@@ -55,6 +64,16 @@ function createWindow(): void {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+
+  win.webContents.on('did-attach-webview', (_event, contents) => {
+    setConsoleSource(contents)
+    contents.setWindowOpenHandler(({ url }) => {
+      contents.loadURL(url)
+      return { action: 'deny' }
+    })
+  })
+
+  onBrowserNavigate((url) => sendToWindow('browser:navigate', url))
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -107,6 +126,32 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
   createWindow()
   setupAutoUpdater()
+  startBrowserMcpServer()
+
+  let execRequestId = 0
+  const pendingExecRequests = new Map<number, (result: any) => void>()
+
+  ipcMain.on('browser:execResult', (_e, { id, result }: { id: number; result: any }) => {
+    const resolve = pendingExecRequests.get(id)
+    if (resolve) {
+      pendingExecRequests.delete(id)
+      resolve(result)
+    }
+  })
+
+  setBrowserExecHandler((action, params) => {
+    return new Promise((resolve) => {
+      const id = ++execRequestId
+      pendingExecRequests.set(id, resolve)
+      sendToWindow('browser:exec', { id, action, params })
+      setTimeout(() => {
+        if (pendingExecRequests.has(id)) {
+          pendingExecRequests.delete(id)
+          resolve({ error: 'Tempo esgotado esperando o painel de navegador responder.' })
+        }
+      }, 15000)
+    })
+  })
 
   ipcMain.handle('kiro:pickFolder', async () => {
     const result = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] })
@@ -129,6 +174,15 @@ app.whenReady().then(() => {
     })
     client.onIncomingRequest(async (method, params) => {
       if (method === 'session/request_permission') {
+        const title: string = params?.toolCall?.title ?? ''
+        if (getSettings().browserAutoApprove && title.includes(`@${BROWSER_MCP_NAME}/`)) {
+          const allowOption =
+            params.options.find((o: any) => o.kind === 'allow_once') ??
+            params.options.find((o: any) => o.kind === 'allow_always') ??
+            params.options[0]
+          return { outcome: { outcome: 'selected', optionId: allowOption.optionId } }
+        }
+
         const id = ++permRequestId
         const decision = await new Promise<string>((resolve) => {
           pendingPermissions.set(id, resolve)
@@ -144,19 +198,33 @@ app.whenReady().then(() => {
     return client.initialize('kiro-desktop', app.getVersion())
   }
 
-  ipcMain.handle('kiro:start', async (_e, cwd: string) => {
-    const initResult = await initClient(cwd)
-    const sessionResult = await client!.newSession(cwd)
-    setLastFolder(cwd)
-    return { initResult, sessionResult }
-  })
+  let clientOpChain: Promise<any> = Promise.resolve()
+  function queueClientOp<T>(fn: () => Promise<T>): Promise<T> {
+    const result = clientOpChain.then(fn, fn)
+    clientOpChain = result.then(
+      () => undefined,
+      () => undefined
+    )
+    return result
+  }
 
-  ipcMain.handle('kiro:openSession', async (_e, { cwd, sessionId }: { cwd: string; sessionId: string }) => {
-    const initResult = await initClient(cwd)
-    const sessionResult = await client!.loadSession(cwd, sessionId)
-    setLastFolder(cwd)
-    return { initResult, sessionResult }
-  })
+  ipcMain.handle('kiro:start', (_e, cwd: string) =>
+    queueClientOp(async () => {
+      const initResult = await initClient(cwd)
+      const sessionResult = await client!.newSession(cwd, [getBrowserMcpServerConfig()])
+      setLastFolder(cwd)
+      return { initResult, sessionResult }
+    })
+  )
+
+  ipcMain.handle('kiro:openSession', (_e, { cwd, sessionId }: { cwd: string; sessionId: string }) =>
+    queueClientOp(async () => {
+      const initResult = await initClient(cwd)
+      const sessionResult = await client!.loadSession(cwd, sessionId, [getBrowserMcpServerConfig()])
+      setLastFolder(cwd)
+      return { initResult, sessionResult }
+    })
+  )
 
   ipcMain.handle('kiro:prompt', async (_e, parts: any[]) => {
     if (!client) throw new Error('Session not started')
@@ -195,7 +263,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('kiro:getDefaultFolder', () => {
-    const dir = join(homedir(), 'projects', 'kiro')
+    const dir = getSettings().defaultFolder ?? join(homedir(), 'projects', 'kiro')
     mkdirSync(dir, { recursive: true })
     return dir
   })
@@ -203,10 +271,28 @@ app.whenReady().then(() => {
   ipcMain.handle('kiro:getStartupFolder', () => {
     const last = getLastFolder()
     if (last && existsSync(last)) return last
-    const dir = join(homedir(), 'projects', 'kiro')
+    const dir = getSettings().defaultFolder ?? join(homedir(), 'projects', 'kiro')
     mkdirSync(dir, { recursive: true })
     return dir
   })
+
+  ipcMain.handle('kiro:getAppVersion', () => app.getVersion())
+
+  ipcMain.handle('kiro:sendFeedback', async (_e, message: string) => {
+    try {
+      const res = await fetch('https://updates.feedbacksele.com.br/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, version: app.getVersion() })
+      })
+      if (!res.ok) return { ok: false }
+      return { ok: true }
+    } catch {
+      return { ok: false }
+    }
+  })
+  ipcMain.handle('kiro:getSettings', () => getSettings())
+  ipcMain.handle('kiro:setSettings', (_e, partial: Partial<ReturnType<typeof getSettings>>) => setSettings(partial))
 
   ipcMain.handle('kiro:restartToUpdate', () => autoUpdater.quitAndInstall(true, true))
 

@@ -11,6 +11,10 @@ const api = {
   openInExplorer: (path: string) => ipcRenderer.invoke('kiro:openInExplorer', path),
   extractPdfText: (path: string) => ipcRenderer.invoke('kiro:extractPdfText', path),
   getDefaultFolder: () => ipcRenderer.invoke('kiro:getDefaultFolder'),
+  getAppVersion: () => ipcRenderer.invoke('kiro:getAppVersion'),
+  sendFeedback: (message: string) => ipcRenderer.invoke('kiro:sendFeedback', message),
+  getSettings: () => ipcRenderer.invoke('kiro:getSettings'),
+  setSettings: (partial: Record<string, unknown>) => ipcRenderer.invoke('kiro:setSettings', partial),
   getStartupFolder: () => ipcRenderer.invoke('kiro:getStartupFolder'),
   restartToUpdate: () => ipcRenderer.invoke('kiro:restartToUpdate'),
   onUpdateReady: (cb: (version: string, notes: string[]) => void) => {
@@ -42,7 +46,19 @@ const api = {
     const listener = (_e: unknown, code: number | null) => cb(code)
     ipcRenderer.on('kiro:exit', listener)
     return () => ipcRenderer.removeListener('kiro:exit', listener)
-  }
+  },
+  onBrowserNavigate: (cb: (url: string) => void) => {
+    const listener = (_e: unknown, url: string) => cb(url)
+    ipcRenderer.on('browser:navigate', listener)
+    return () => ipcRenderer.removeListener('browser:navigate', listener)
+  },
+  onBrowserExec: (cb: (id: number, action: string, params: any) => void) => {
+    const listener = (_e: unknown, payload: { id: number; action: string; params: any }) =>
+      cb(payload.id, payload.action, payload.params)
+    ipcRenderer.on('browser:exec', listener)
+    return () => ipcRenderer.removeListener('browser:exec', listener)
+  },
+  sendBrowserExecResult: (id: number, result: any) => ipcRenderer.send('browser:execResult', { id, result })
 }
 
 contextBridge.exposeInMainWorld('kiro', api)

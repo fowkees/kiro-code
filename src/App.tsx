@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { DragEvent, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import TopBar from './components/TopBar'
-import Composer from './components/Composer'
+import Composer, { ComposerHandle } from './components/Composer'
 import ToolCallCard from './components/ToolCallCard'
 import PermissionModal from './components/PermissionModal'
 import Sidebar from './components/Sidebar'
 import UpdateModal from './components/UpdateModal'
+import ImageLightbox from './components/ImageLightbox'
+import { PaperclipIcon } from './components/icons'
 import { Attachment, Block, ModelInfo, PermissionRequest, SessionSummary } from './types'
 
 function extractText(content: any): string {
@@ -38,8 +40,12 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState<{ version: string; notes: string[] } | null>(null)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
   const [hasExchanged, setHasExchanged] = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const autoConnectStarted = useRef(false)
+  const composerRef = useRef<ComposerHandle>(null)
+  const dragCounter = useRef(0)
+  const [isDragging, setIsDragging] = useState(false)
 
   async function refreshSessions() {
     const list = await window.kiro.listSessions()
@@ -220,6 +226,30 @@ export default function App() {
     window.kiro.cancel()
   }
 
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    if (!connected) return
+    dragCounter.current += 1
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    dragCounter.current = 0
+    setIsDragging(false)
+    if (!connected) return
+    if (e.dataTransfer.files.length > 0) composerRef.current?.addFiles(e.dataTransfer.files)
+  }
+
   function restartToUpdate() {
     window.kiro.restartToUpdate()
   }
@@ -254,7 +284,19 @@ export default function App() {
   const folderLabel = cwd ? cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd : null
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragEnter={handleDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="app-drop-overlay">
+          <PaperclipIcon width={28} height={28} />
+          Solte para anexar ao Kiro
+        </div>
+      )}
       <Sidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -291,11 +333,22 @@ export default function App() {
                   <div className="msg__bubble">
                     {block.attachments && block.attachments.length > 0 && (
                       <div className="msg__attachments">
-                        {block.attachments.map((a) => (
-                          <span key={a.id} className="attachment-chip attachment-chip--static">
-                            {a.name}
-                          </span>
-                        ))}
+                        {block.attachments.map((a) =>
+                          a.kind === 'image' ? (
+                            <img
+                              key={a.id}
+                              src={`data:${a.mimeType};base64,${a.data}`}
+                              alt={a.name}
+                              title={a.name}
+                              className="attachment-chip__thumb attachment-chip__thumb--static"
+                              onClick={() => setLightboxSrc(`data:${a.mimeType};base64,${a.data}`)}
+                            />
+                          ) : (
+                            <span key={a.id} className="attachment-chip attachment-chip--static">
+                              {a.name}
+                            </span>
+                          )
+                        )}
                       </div>
                     )}
                     {block.text}
@@ -344,6 +397,7 @@ export default function App() {
         </div>
 
         <Composer
+          ref={composerRef}
           disabled={!connected}
           busy={busy}
           connected={connected}
@@ -353,6 +407,7 @@ export default function App() {
           creditsUnit={creditsUnit}
           onSend={sendMessage}
           onCancel={cancelPrompt}
+          onPreviewImage={setLightboxSrc}
         />
       </div>
 
@@ -366,6 +421,8 @@ export default function App() {
           onLater={closeUpdateModal}
         />
       )}
+
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
+import { ChangeEvent, KeyboardEvent, forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { Attachment } from '../types'
 import { ArrowUpIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
 
@@ -33,31 +33,30 @@ async function fileToAttachment(file: File): Promise<Attachment> {
   return { id: nextAttId(), name: file.name, kind: 'text', text }
 }
 
-export default function Composer({
-  disabled,
-  busy,
-  connected,
-  modelName,
-  contextUsage,
-  creditsUsed,
-  creditsUnit,
-  onSend,
-  onCancel
-}: {
-  disabled: boolean
-  busy: boolean
-  connected: boolean
-  modelName: string | null
-  contextUsage: number | null
-  creditsUsed: number
-  creditsUnit: string
-  onSend: (text: string, attachments: Attachment[]) => void
-  onCancel: () => void
-}) {
+export interface ComposerHandle {
+  addFiles: (files: FileList | File[]) => void
+}
+
+const Composer = forwardRef<
+  ComposerHandle,
+  {
+    disabled: boolean
+    busy: boolean
+    connected: boolean
+    modelName: string | null
+    contextUsage: number | null
+    creditsUsed: number
+    creditsUnit: string
+    onSend: (text: string, attachments: Attachment[]) => void
+    onCancel: () => void
+    onPreviewImage: (src: string) => void
+  }
+>(function Composer(
+  { disabled, busy, connected, modelName, contextUsage, creditsUsed, creditsUnit, onSend, onCancel, onPreviewImage },
+  ref
+) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [isDragging, setIsDragging] = useState(false)
-  const dragCounter = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -74,33 +73,11 @@ export default function Composer({
     setAttachments((prev) => [...prev, ...results])
   }
 
+  useImperativeHandle(ref, () => ({ addFiles }))
+
   function handleFileInput(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.files) addFiles(e.target.files)
     e.target.value = ''
-  }
-
-  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    if (disabled) return
-    dragCounter.current += 1
-    setIsDragging(true)
-  }
-
-  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    dragCounter.current -= 1
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0
-      setIsDragging(false)
-    }
-  }
-
-  function handleDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    dragCounter.current = 0
-    setIsDragging(false)
-    if (disabled) return
-    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
   }
 
   function removeAttachment(id: string) {
@@ -123,25 +100,23 @@ export default function Composer({
   }
 
   return (
-    <div
-      className={`composer ${isDragging ? 'composer--dragging' : ''}`}
-      onDragEnter={handleDragEnter}
-      onDragOver={(e) => e.preventDefault()}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="composer">
       <div className="composer__box">
-        {isDragging && (
-          <div className="composer__drop-overlay">
-            <PaperclipIcon width={22} height={22} />
-            Solte para anexar
-          </div>
-        )}
         {attachments.length > 0 && (
           <div className="composer__attachments">
             {attachments.map((a) => (
-              <div key={a.id} className="attachment-chip">
-                <span className="attachment-chip__name">{a.name}</span>
+              <div key={a.id} className={`attachment-chip ${a.kind === 'image' ? 'attachment-chip--image' : ''}`}>
+                {a.kind === 'image' ? (
+                  <img
+                    src={`data:${a.mimeType};base64,${a.data}`}
+                    alt={a.name}
+                    title={a.name}
+                    className="attachment-chip__thumb"
+                    onClick={() => onPreviewImage(`data:${a.mimeType};base64,${a.data}`)}
+                  />
+                ) : (
+                  <span className="attachment-chip__name">{a.name}</span>
+                )}
                 <button className="attachment-chip__remove" onClick={() => removeAttachment(a.id)} title="Remover">
                   <XIcon width={11} height={11} />
                 </button>
@@ -205,4 +180,6 @@ export default function Composer({
       </div>
     </div>
   )
-}
+})
+
+export default Composer

@@ -8,7 +8,7 @@ import PermissionModal from './components/PermissionModal'
 import Sidebar from './components/Sidebar'
 import UpdateModal from './components/UpdateModal'
 import ImageLightbox from './components/ImageLightbox'
-import { PaperclipIcon } from './components/icons'
+import { FileIcon, PaperclipIcon } from './components/icons'
 import { Attachment, Block, ModelInfo, PermissionRequest, SessionSummary } from './types'
 
 function extractText(content: any): string {
@@ -344,7 +344,17 @@ export default function App() {
                               onClick={() => setLightboxSrc(`data:${a.mimeType};base64,${a.data}`)}
                             />
                           ) : (
-                            <span key={a.id} className="attachment-chip attachment-chip--static">
+                            <span
+                              key={a.id}
+                              className={`attachment-chip attachment-chip--static ${a.filePath ? 'attachment-chip--clickable' : ''}`}
+                              onClick={() => a.filePath && window.kiro.openInExplorer(a.filePath)}
+                              title={a.filePath ? 'Abrir arquivo' : undefined}
+                            >
+                              <FileIcon
+                                width={13}
+                                height={13}
+                                className={`attachment-chip__icon attachment-chip__icon--${a.fileCategory ?? 'generic'}`}
+                              />
                               {a.name}
                             </span>
                           )

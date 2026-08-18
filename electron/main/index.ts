@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron'
 import electronUpdater from 'electron-updater'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -161,6 +161,18 @@ app.whenReady().then(() => {
   ipcMain.handle('kiro:stop', () => stopClient())
 
   ipcMain.handle('kiro:openInExplorer', (_e, path: string) => shell.openPath(path))
+
+  ipcMain.handle('kiro:extractPdfText', async (_e, path: string) => {
+    try {
+      const { PDFParse } = await import('pdf-parse')
+      const data = readFileSync(path)
+      const parser = new PDFParse({ data })
+      const result = await parser.getText()
+      return result.text
+    } catch (err: any) {
+      return `(não foi possível ler o conteúdo do PDF: ${err?.message ?? err})`
+    }
+  })
 
   ipcMain.handle('kiro:getDefaultFolder', () => {
     const dir = join(homedir(), 'projects', 'kiro')

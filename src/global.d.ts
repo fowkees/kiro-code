@@ -9,6 +9,7 @@ declare global {
       cancel(): Promise<void>
       stop(): Promise<void>
       openInExplorer(path: string): Promise<void>
+      extractPdfText(path: string): Promise<string>
       getDefaultFolder(): Promise<string>
       restartToUpdate(): Promise<void>
       onUpdateReady(cb: (version: string, notes: string[]) => void): () => void

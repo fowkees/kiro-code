@@ -119,6 +119,15 @@ export function StopIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function FileIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M13 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+      <path d="M13 2v6h6" />
+    </Icon>
+  )
+}
+
 export function XIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props} strokeWidth={2}>

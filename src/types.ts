@@ -1,3 +1,5 @@
+export type FileCategory = 'pdf' | 'doc' | 'sheet' | 'archive' | 'code' | 'generic'
+
 export interface Attachment {
   id: string
   name: string
@@ -5,6 +7,8 @@ export interface Attachment {
   mimeType?: string
   data?: string
   text?: string
+  fileCategory?: FileCategory
+  filePath?: string
 }
 
 export type Block =

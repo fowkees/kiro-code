@@ -7,6 +7,7 @@ const api = {
   cancel: () => ipcRenderer.invoke('kiro:cancel'),
   stop: () => ipcRenderer.invoke('kiro:stop'),
   openInExplorer: (path: string) => ipcRenderer.invoke('kiro:openInExplorer', path),
+  extractPdfText: (path: string) => ipcRenderer.invoke('kiro:extractPdfText', path),
   getDefaultFolder: () => ipcRenderer.invoke('kiro:getDefaultFolder'),
   restartToUpdate: () => ipcRenderer.invoke('kiro:restartToUpdate'),
   onUpdateReady: (cb: (version: string, notes: string[]) => void) => {

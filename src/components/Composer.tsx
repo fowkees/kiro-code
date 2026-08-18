@@ -1,6 +1,7 @@
 import { ChangeEvent, KeyboardEvent, forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { Attachment } from '../types'
-import { ArrowUpIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
+import { getFileCategory, isPlainTextFile } from '../lib/fileTypes'
+import { ArrowUpIcon, FileIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
 
 let attId = 0
 const nextAttId = () => `att${++attId}`
@@ -24,13 +25,34 @@ function readAsText(file: File): Promise<string> {
 }
 
 async function fileToAttachment(file: File): Promise<Attachment> {
+  const filePath = (file as unknown as { path?: string }).path
+
   if (file.type.startsWith('image/')) {
     const dataUrl = await readAsDataUrl(file)
     const data = dataUrl.slice(dataUrl.indexOf(',') + 1)
-    return { id: nextAttId(), name: file.name, kind: 'image', mimeType: file.type || 'image/png', data }
+    return { id: nextAttId(), name: file.name, kind: 'image', mimeType: file.type || 'image/png', data, filePath }
   }
-  const text = await readAsText(file)
-  return { id: nextAttId(), name: file.name, kind: 'text', text }
+
+  const category = getFileCategory(file.name)
+
+  if (category === 'pdf' && filePath) {
+    const text = await window.kiro.extractPdfText(filePath)
+    return { id: nextAttId(), name: file.name, kind: 'text', text, fileCategory: 'pdf', filePath }
+  }
+
+  if (isPlainTextFile(file.name)) {
+    const text = await readAsText(file)
+    return { id: nextAttId(), name: file.name, kind: 'text', text, fileCategory: category, filePath }
+  }
+
+  return {
+    id: nextAttId(),
+    name: file.name,
+    kind: 'text',
+    text: `(arquivo "${file.name}" anexado, mas o conteúdo não pôde ser lido automaticamente)`,
+    fileCategory: category,
+    filePath
+  }
 }
 
 export interface ComposerHandle {
@@ -115,7 +137,14 @@ const Composer = forwardRef<
                     onClick={() => onPreviewImage(`data:${a.mimeType};base64,${a.data}`)}
                   />
                 ) : (
-                  <span className="attachment-chip__name">{a.name}</span>
+                  <>
+                    <FileIcon
+                      width={14}
+                      height={14}
+                      className={`attachment-chip__icon attachment-chip__icon--${a.fileCategory ?? 'generic'}`}
+                    />
+                    <span className="attachment-chip__name">{a.name}</span>
+                  </>
                 )}
                 <button className="attachment-chip__remove" onClick={() => removeAttachment(a.id)} title="Remover">
                   <XIcon width={11} height={11} />

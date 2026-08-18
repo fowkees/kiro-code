@@ -858,6 +858,40 @@ body {
   text-overflow: ellipsis;
 }
 
+.attachment-chip__icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.attachment-chip__icon--pdf {
+  color: #e06666;
+}
+
+.attachment-chip__icon--doc {
+  color: #6b9bd8;
+}
+
+.attachment-chip__icon--sheet {
+  color: #7fb069;
+}
+
+.attachment-chip__icon--archive {
+  color: #d9b35c;
+}
+
+.attachment-chip__icon--code {
+  color: var(--accent);
+}
+
+.attachment-chip--clickable {
+  cursor: pointer;
+}
+
+.attachment-chip--clickable:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .attachment-chip__remove {
   flex-shrink: 0;
   width: 16px;

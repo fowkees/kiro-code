@@ -6,6 +6,7 @@ declare global {
       pickFolder(): Promise<string | null>
       start(cwd: string): Promise<any>
       prompt(parts: any[]): Promise<any>
+      cancel(): Promise<void>
       stop(): Promise<void>
       openInExplorer(path: string): Promise<void>
       getDefaultFolder(): Promise<string>

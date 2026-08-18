@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import TopBar from './components/TopBar'
 import Composer from './components/Composer'
 import ToolCallCard from './components/ToolCallCard'
@@ -207,10 +208,16 @@ export default function App() {
         }
       }
       await window.kiro.prompt(parts)
+    } catch {
+      // cancelled or failed; nothing else to do here
     } finally {
       setBusy(false)
       refreshSessions()
     }
+  }
+
+  function cancelPrompt() {
+    window.kiro.cancel()
   }
 
   function restartToUpdate() {
@@ -269,6 +276,7 @@ export default function App() {
           onOpenUpdate={() => setShowUpdateModal(true)}
         />
 
+        <div className="timeline-wrap">
         <div className="timeline" ref={scrollRef}>
           {blocks.length === 0 && (
             <div className="empty-state">
@@ -299,7 +307,18 @@ export default function App() {
               return (
                 <div key={block.id} className="msg msg--assistant">
                   <div className="msg__bubble markdown">
-                    <ReactMarkdown>{block.text}</ReactMarkdown>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noreferrer">
+                            {children}
+                          </a>
+                        )
+                      }}
+                    >
+                      {block.text}
+                    </ReactMarkdown>
                   </div>
                 </div>
               )
@@ -313,11 +332,15 @@ export default function App() {
             }
             return <ToolCallCard key={block.id} block={block} />
           })}
-          {busy && (
-            <div className="msg msg--assistant">
-              <div className="typing-indicator">Kiro está trabalhando…</div>
+          {blocks.length > 0 && (
+            <div className="chat-end-ghost" key={blocks.length}>
+              <img src="./icon.png" alt="" className="typing-indicator__ghost" />
+              {busy && <span>Kiro está trabalhando…</span>}
             </div>
           )}
+        </div>
+        <div className="timeline-fade timeline-fade--top" />
+        <div className="timeline-fade timeline-fade--bottom" />
         </div>
 
         <Composer
@@ -329,6 +352,7 @@ export default function App() {
           creditsUsed={hasExchanged ? creditsUsed : 0}
           creditsUnit={creditsUnit}
           onSend={sendMessage}
+          onCancel={cancelPrompt}
         />
       </div>
 

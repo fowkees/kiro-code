@@ -1,6 +1,6 @@
-import { ChangeEvent, DragEvent, KeyboardEvent, useRef, useState } from 'react'
+import { ChangeEvent, DragEvent, KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
 import { Attachment } from '../types'
-import { ArrowUpIcon, PaperclipIcon, XIcon } from './icons'
+import { ArrowUpIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
 
 let attId = 0
 const nextAttId = () => `att${++attId}`
@@ -41,7 +41,8 @@ export default function Composer({
   contextUsage,
   creditsUsed,
   creditsUnit,
-  onSend
+  onSend,
+  onCancel
 }: {
   disabled: boolean
   busy: boolean
@@ -51,10 +52,21 @@ export default function Composer({
   creditsUsed: number
   creditsUnit: string
   onSend: (text: string, attachments: Attachment[]) => void
+  onCancel: () => void
 }) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const dragCounter = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
 
   async function addFiles(files: FileList | File[]) {
     const list = Array.from(files)
@@ -67,8 +79,27 @@ export default function Composer({
     e.target.value = ''
   }
 
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    if (disabled) return
+    dragCounter.current += 1
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
+  }
+
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
+    dragCounter.current = 0
+    setIsDragging(false)
+    if (disabled) return
     if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
   }
 
@@ -92,8 +123,20 @@ export default function Composer({
   }
 
   return (
-    <div className="composer">
-      <div className="composer__box" onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+    <div
+      className={`composer ${isDragging ? 'composer--dragging' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className="composer__box">
+        {isDragging && (
+          <div className="composer__drop-overlay">
+            <PaperclipIcon width={22} height={22} />
+            Solte para anexar
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="composer__attachments">
             {attachments.map((a) => (
@@ -117,6 +160,7 @@ export default function Composer({
           </button>
           <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileInput} />
           <textarea
+            ref={textareaRef}
             className="composer__input"
             placeholder={disabled ? 'Abra uma pasta para começar' : 'Converse com o Kiro…'}
             value={value}
@@ -125,14 +169,20 @@ export default function Composer({
             onKeyDown={handleKeyDown}
             rows={1}
           />
-          <button
-            className="composer__send"
-            disabled={disabled || busy || (!value.trim() && attachments.length === 0)}
-            onClick={submit}
-            title="Enviar"
-          >
-            <ArrowUpIcon width={16} height={16} strokeWidth={2.25} />
-          </button>
+          {busy ? (
+            <button className="composer__send composer__send--stop" onClick={onCancel} title="Interromper">
+              <StopIcon width={13} height={13} />
+            </button>
+          ) : (
+            <button
+              className="composer__send"
+              disabled={disabled || (!value.trim() && attachments.length === 0)}
+              onClick={submit}
+              title="Enviar"
+            >
+              <ArrowUpIcon width={16} height={16} strokeWidth={2.25} />
+            </button>
+          )}
         </div>
       </div>
       <div className="composer__toolbar">

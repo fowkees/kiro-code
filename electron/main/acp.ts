@@ -99,6 +99,10 @@ export class AcpClient extends EventEmitter {
     this.proc?.stdin.write(JSON.stringify(msg) + '\n')
   }
 
+  notify(method: string, params?: any): void {
+    this.send({ jsonrpc: '2.0', method, params })
+  }
+
   request<T = any>(method: string, params?: any): Promise<T> {
     if (!this.proc) return Promise.reject(new Error('ACP process not running'))
     const id = this.nextId++
@@ -128,5 +132,10 @@ export class AcpClient extends EventEmitter {
       sessionId: this.sessionId,
       prompt: parts
     })
+  }
+
+  cancel(): void {
+    if (!this.sessionId) return
+    this.notify('session/cancel', { sessionId: this.sessionId })
   }
 }

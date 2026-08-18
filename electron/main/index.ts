@@ -63,6 +63,7 @@ function createWindow(): void {
 }
 
 function stopClient(): void {
+  client?.removeAllListeners()
   client?.stop()
   client = null
 }
@@ -146,6 +147,8 @@ app.whenReady().then(() => {
     if (!client) throw new Error('Session not started')
     return client.prompt(parts)
   })
+
+  ipcMain.handle('kiro:cancel', () => client?.cancel())
 
   ipcMain.handle('kiro:permissionResponse', (_e, { id, optionId }: { id: number; optionId: string }) => {
     const resolve = pendingPermissions.get(id)

@@ -4,6 +4,7 @@ const api = {
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('kiro:pickFolder'),
   start: (cwd: string) => ipcRenderer.invoke('kiro:start', cwd),
   prompt: (parts: any[]) => ipcRenderer.invoke('kiro:prompt', parts),
+  cancel: () => ipcRenderer.invoke('kiro:cancel'),
   stop: () => ipcRenderer.invoke('kiro:stop'),
   openInExplorer: (path: string) => ipcRenderer.invoke('kiro:openInExplorer', path),
   getDefaultFolder: () => ipcRenderer.invoke('kiro:getDefaultFolder'),

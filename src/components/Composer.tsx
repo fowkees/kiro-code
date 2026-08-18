@@ -237,7 +237,7 @@ const Composer = forwardRef<
 
   return (
     <div className="composer">
-      <div className="composer__box">
+      <div className={`composer__box ${busy ? 'composer__box--busy' : ''}`}>
         {attachments.length > 0 && (
           <div className="composer__attachments">
             {attachments.map((a) => (

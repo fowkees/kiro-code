@@ -77,7 +77,7 @@ export default function Sidebar({
         </button>
         <div className="sidebar__rail-spacer" />
         <button className="sidebar__rail-btn" title="Sugerir uma melhoria" onClick={onOpenFeedback}>
-          <FeedbackSparkleIcon width={15} height={15} />
+          <FeedbackSparkleIcon width={15} height={15} className="feedback-sparkle-pulse" />
         </button>
         <button className="sidebar__rail-btn" title="Configurações" onClick={onOpenSettings}>
           <SettingsIcon width={16} height={16} />
@@ -216,7 +216,7 @@ export default function Sidebar({
 
       <div className="sidebar__footer">
         <button className="sidebar__footer-btn" title="Sugerir uma melhoria" onClick={onOpenFeedback}>
-          <FeedbackSparkleIcon width={14} height={14} />
+          <FeedbackSparkleIcon width={14} height={14} className="feedback-sparkle-pulse" />
         </button>
         <button className="sidebar__footer-btn" title="Configurações" onClick={onOpenSettings}>
           <SettingsIcon width={15} height={15} />

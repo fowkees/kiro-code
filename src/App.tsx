@@ -11,7 +11,7 @@ import SettingsModal from './components/SettingsModal'
 import FeedbackModal from './components/FeedbackModal'
 import UpdateModal from './components/UpdateModal'
 import ImageLightbox from './components/ImageLightbox'
-import { FileIcon, PaperclipIcon } from './components/icons'
+import { CheckIcon, CopyIcon, FileIcon, PaperclipIcon } from './components/icons'
 import { AppSettings, Attachment, Block, ModelInfo, PermissionRequest, SessionSummary } from './types'
 
 function extractText(content: any): string {
@@ -30,6 +30,33 @@ const FONT_SIZE_PX: Record<AppSettings['fontSize'], string> = {
   small: '13px',
   medium: '14px',
   large: '16px'
+}
+
+function CodeBlock({ children, ...props }: any) {
+  const preRef = useRef<HTMLPreElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  function copy() {
+    const text = preRef.current?.innerText ?? ''
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="code-block">
+      <button
+        className={`code-block__copy ${copied ? 'code-block__copy--done' : ''}`}
+        onClick={copy}
+        title="Copiar código"
+      >
+        {copied ? <CheckIcon width={12} height={12} /> : <CopyIcon width={12} height={12} />}
+      </button>
+      <pre ref={preRef} {...props}>
+        {children}
+      </pre>
+    </div>
+  )
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -65,6 +92,7 @@ export default function App() {
   const [settings, setSettingsState] = useState<AppSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [browserWidth, setBrowserWidth] = useState(420)
   const resizingBrowser = useRef(false)
   const browserPanelRef = useRef<HTMLDivElement>(null)
@@ -307,6 +335,12 @@ export default function App() {
     window.kiro.cancel()
   }
 
+  function copyMessage(id: string, text: string) {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500)
+  }
+
   async function selectModel(modelId: string) {
     setCurrentModelId(modelId)
     try {
@@ -470,11 +504,12 @@ export default function App() {
         <div className="timeline" ref={scrollRef}>
           {blocks.length === 0 && (
             <div className="empty-state">
+              <img src="./mascot.png" alt="" className="empty-state__mascot" />
               <h2>Kiro Code</h2>
               <p>Abra uma pasta de projeto para começar a conversar com o seu agente Kiro.</p>
             </div>
           )}
-          {blocks.map((block) => {
+          {blocks.map((block, blockIndex) => {
             if (block.kind === 'user') {
               return (
                 <div key={block.id} className="msg msg--user">
@@ -515,6 +550,7 @@ export default function App() {
               )
             }
             if (block.kind === 'assistant') {
+              const isStreaming = busy && blockIndex === blocks.length - 1
               return (
                 <div key={block.id} className="msg msg--assistant">
                   <div className="msg__bubble markdown">
@@ -525,12 +561,23 @@ export default function App() {
                           <a href={href} target="_blank" rel="noreferrer">
                             {children}
                           </a>
-                        )
+                        ),
+                        pre: CodeBlock
                       }}
                     >
                       {block.text}
                     </ReactMarkdown>
+                    {isStreaming && <span className="typing-cursor" />}
                   </div>
+                  {!isStreaming && block.text && (
+                    <button
+                      className="msg__copy-btn"
+                      onClick={() => copyMessage(block.id, block.text)}
+                      title="Copiar mensagem"
+                    >
+                      {copiedId === block.id ? <CheckIcon width={13} height={13} /> : <CopyIcon width={13} height={13} />}
+                    </button>
+                  )}
                 </div>
               )
             }

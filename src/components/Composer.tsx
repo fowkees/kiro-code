@@ -1,7 +1,97 @@
-import { ChangeEvent, KeyboardEvent, forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
-import { Attachment } from '../types'
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState
+} from 'react'
+import { Attachment, ModelInfo } from '../types'
 import { getFileCategory, isPlainTextFile } from '../lib/fileTypes'
-import { ArrowUpIcon, FileIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
+import { ArrowUpIcon, ChevronDownIcon, FileIcon, InfoIcon, PaperclipIcon, StopIcon, XIcon } from './icons'
+
+function shortCwd(cwd: string): string {
+  const parts = cwd.split(/[\\/]/).filter(Boolean)
+  return '/' + parts.slice(-2).map((p) => p.toLowerCase()).join('/')
+}
+
+const AUTO_DESCRIPTION = 'O Kiro escolhe automaticamente o modelo mais adequado para cada tarefa, buscando o melhor equilíbrio entre qualidade e velocidade.'
+
+function ModelSelector({
+  models,
+  currentModelId,
+  onSelect
+}: {
+  models: ModelInfo[]
+  currentModelId: string | null
+  onSelect: (modelId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [hoverInfo, setHoverInfo] = useState<string | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setHoverInfo(null)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
+  if (models.length === 0) return null
+
+  const current = models.find((m) => m.modelId === currentModelId)
+  const label = current?.name ?? currentModelId ?? 'auto'
+
+  return (
+    <div className="model-selector" ref={wrapRef}>
+      <button
+        type="button"
+        className="composer__model-pill composer__model-pill--button"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {label}
+        <ChevronDownIcon width={12} height={12} />
+      </button>
+      {open && (
+        <div className="model-selector__menu">
+          {models.map((m) => (
+            <div
+              key={m.modelId}
+              className={`model-selector__item ${m.modelId === currentModelId ? 'model-selector__item--active' : ''}`}
+              onClick={() => {
+                onSelect(m.modelId)
+                setOpen(false)
+                setHoverInfo(null)
+              }}
+            >
+              <span className="model-selector__name">{m.name}</span>
+              <span
+                className="model-selector__info"
+                onMouseEnter={() => setHoverInfo(m.modelId)}
+                onMouseLeave={() => setHoverInfo(null)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <InfoIcon width={12} height={12} />
+                {hoverInfo === m.modelId && (
+                  <span className="model-selector__tooltip">
+                    {m.modelId === 'auto' ? AUTO_DESCRIPTION : m.description ?? 'Sem descrição disponível.'}
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 let attId = 0
 const nextAttId = () => `att${++attId}`
@@ -65,16 +155,33 @@ const Composer = forwardRef<
     disabled: boolean
     busy: boolean
     connected: boolean
-    modelName: string | null
+    cwd: string | null
+    models: ModelInfo[]
+    currentModelId: string | null
     contextUsage: number | null
     creditsUsed: number
     creditsUnit: string
     onSend: (text: string, attachments: Attachment[]) => void
     onCancel: () => void
     onPreviewImage: (src: string) => void
+    onSelectModel: (modelId: string) => void
   }
 >(function Composer(
-  { disabled, busy, connected, modelName, contextUsage, creditsUsed, creditsUnit, onSend, onCancel, onPreviewImage },
+  {
+    disabled,
+    busy,
+    connected,
+    cwd,
+    models,
+    currentModelId,
+    contextUsage,
+    creditsUsed,
+    creditsUnit,
+    onSend,
+    onCancel,
+    onPreviewImage,
+    onSelectModel
+  },
   ref
 ) {
   const [value, setValue] = useState('')
@@ -190,7 +297,7 @@ const Composer = forwardRef<
         </div>
       </div>
       <div className="composer__toolbar">
-        {modelName && <span className="composer__model-pill">{modelName}</span>}
+        <ModelSelector models={models} currentModelId={currentModelId} onSelect={onSelectModel} />
         {creditsUsed > 0 && (
           <span className="composer__model-pill" title="Créditos consumidos nesta conversa">
             {creditsUsed.toFixed(2)} {creditsUnit}
@@ -202,6 +309,11 @@ const Composer = forwardRef<
           </span>
         )}
         <div className="composer__spacer" />
+        {connected && cwd && (
+          <span className="composer__cwd-path" title={cwd}>
+            {shortCwd(cwd)}
+          </span>
+        )}
         <span className={`composer__status ${connected ? 'composer__status--on' : 'composer__status--off'}`}>
           <span className="composer__status-dot" />
           {connected ? 'conectado' : 'desconectado'}

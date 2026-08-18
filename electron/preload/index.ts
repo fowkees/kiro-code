@@ -3,12 +3,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('kiro:pickFolder'),
   start: (cwd: string) => ipcRenderer.invoke('kiro:start', cwd),
+  openSession: (cwd: string, sessionId: string) => ipcRenderer.invoke('kiro:openSession', { cwd, sessionId }),
   prompt: (parts: any[]) => ipcRenderer.invoke('kiro:prompt', parts),
   cancel: () => ipcRenderer.invoke('kiro:cancel'),
+  setModel: (modelId: string) => ipcRenderer.invoke('kiro:setModel', modelId),
   stop: () => ipcRenderer.invoke('kiro:stop'),
   openInExplorer: (path: string) => ipcRenderer.invoke('kiro:openInExplorer', path),
   extractPdfText: (path: string) => ipcRenderer.invoke('kiro:extractPdfText', path),
   getDefaultFolder: () => ipcRenderer.invoke('kiro:getDefaultFolder'),
+  getStartupFolder: () => ipcRenderer.invoke('kiro:getStartupFolder'),
   restartToUpdate: () => ipcRenderer.invoke('kiro:restartToUpdate'),
   onUpdateReady: (cb: (version: string, notes: string[]) => void) => {
     const listener = (_e: unknown, payload: { version: string; notes: string[] }) =>

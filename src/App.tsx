@@ -46,6 +46,7 @@ export default function App() {
   const composerRef = useRef<ComposerHandle>(null)
   const dragCounter = useRef(0)
   const [isDragging, setIsDragging] = useState(false)
+  const suppressReplayRef = useRef(false)
 
   async function refreshSessions() {
     const list = await window.kiro.listSessions()
@@ -57,9 +58,9 @@ export default function App() {
     if (autoConnectStarted.current) return
     autoConnectStarted.current = true
     window.kiro
-      .getDefaultFolder()
+      .getStartupFolder()
       .then((folder) => connectTo(folder))
-      .catch((err) => console.error('Falha ao abrir a pasta padrão:', err))
+      .catch((err) => console.error('Falha ao abrir a pasta inicial:', err))
   }, [])
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export default function App() {
         return
       }
       if (method !== 'session/update') return
+      if (suppressReplayRef.current) return
       const upd = params?.update
       if (!upd) return
 
@@ -89,6 +91,17 @@ export default function App() {
             next[next.length - 1] = { ...last, text: last.text + text }
           } else {
             next.push({ kind: 'assistant', id: nextId(), text })
+          }
+          return next
+        }
+
+        if (upd.sessionUpdate === 'user_message_chunk') {
+          const text = extractText(upd.content)
+          const last = next[next.length - 1]
+          if (last && last.kind === 'user') {
+            next[next.length - 1] = { ...last, text: last.text + text }
+          } else {
+            next.push({ kind: 'user', id: nextId(), text })
           }
           return next
         }
@@ -186,17 +199,29 @@ export default function App() {
   async function onNewChat() {
     setBlocks([])
     setActiveSessionId(null)
-    if (cwd) await connectTo(cwd)
+    const folder = await window.kiro.getDefaultFolder()
+    await connectTo(folder)
   }
 
   async function onOpenSession(session: SessionSummary) {
     const turns = await window.kiro.readTranscript(session.sessionId)
-    setBlocks(
-      turns.map((t) => ({ kind: t.role, id: nextId(), text: t.text }) as Block)
-    )
+    setBlocks(turns.map((t) => ({ kind: t.role, id: nextId(), text: t.text }) as Block))
     setActiveSessionId(session.sessionId)
-    await connectTo(session.cwd)
-    if (turns.length > 0) setHasExchanged(true)
+    setCwd(session.cwd)
+    setHasExchanged(turns.length > 0)
+    setContextUsage(null)
+    setCreditsUsed(0)
+
+    suppressReplayRef.current = true
+    try {
+      const { sessionResult } = await window.kiro.openSession(session.cwd, session.sessionId)
+      setConnected(true)
+      setModels(sessionResult?.models?.availableModels ?? [])
+      setCurrentModelId(sessionResult?.models?.currentModelId ?? null)
+      setActiveSessionId(session.sessionId)
+    } finally {
+      suppressReplayRef.current = false
+    }
   }
 
   async function sendMessage(text: string, attachments: Attachment[]) {
@@ -224,6 +249,15 @@ export default function App() {
 
   function cancelPrompt() {
     window.kiro.cancel()
+  }
+
+  async function selectModel(modelId: string) {
+    setCurrentModelId(modelId)
+    try {
+      await window.kiro.setModel(modelId)
+    } catch (err) {
+      console.error('Falha ao trocar de modelo:', err)
+    }
   }
 
   function handleDragEnter(e: DragEvent<HTMLDivElement>) {
@@ -278,7 +312,6 @@ export default function App() {
     setPermissionRequest(null)
   }
 
-  const modelName = models.find((m) => m.modelId === currentModelId)?.name ?? currentModelId
   const activeTitle =
     sessions.find((s) => s.sessionId === activeSessionId)?.title ?? (cwd ? 'Nova conversa' : 'Kiro Code')
   const folderLabel = cwd ? cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd : null
@@ -411,7 +444,10 @@ export default function App() {
           disabled={!connected}
           busy={busy}
           connected={connected}
-          modelName={modelName ?? null}
+          cwd={cwd}
+          models={models}
+          currentModelId={currentModelId}
+          onSelectModel={selectModel}
           contextUsage={hasExchanged ? contextUsage : null}
           creditsUsed={hasExchanged ? creditsUsed : 0}
           creditsUnit={creditsUnit}

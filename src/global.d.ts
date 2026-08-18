@@ -5,12 +5,15 @@ declare global {
     kiro: {
       pickFolder(): Promise<string | null>
       start(cwd: string): Promise<any>
+      openSession(cwd: string, sessionId: string): Promise<any>
       prompt(parts: any[]): Promise<any>
       cancel(): Promise<void>
+      setModel(modelId: string): Promise<any>
       stop(): Promise<void>
       openInExplorer(path: string): Promise<void>
       extractPdfText(path: string): Promise<string>
       getDefaultFolder(): Promise<string>
+      getStartupFolder(): Promise<string>
       restartToUpdate(): Promise<void>
       onUpdateReady(cb: (version: string, notes: string[]) => void): () => void
       respondPermission(id: number, optionId: string): Promise<void>

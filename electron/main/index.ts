@@ -1,11 +1,12 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron'
 import electronUpdater from 'electron-updater'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AcpClient } from './acp'
 import { deleteSession, listSessions, readTranscript, renameSession } from './sessions'
+import { getLastFolder, setLastFolder } from './state'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const { autoUpdater } = electronUpdater
@@ -62,10 +63,12 @@ function createWindow(): void {
   }
 }
 
-function stopClient(): void {
-  client?.removeAllListeners()
-  client?.stop()
+async function stopClient(): Promise<void> {
+  if (!client) return
+  const c = client
   client = null
+  c.removeAllListeners()
+  await c.stop()
 }
 
 app.setAppUserModelId('com.kirodesktop.app')
@@ -111,8 +114,8 @@ app.whenReady().then(() => {
     return result.filePaths[0]
   })
 
-  ipcMain.handle('kiro:start', async (_e, cwd: string) => {
-    stopClient()
+  async function initClient(cwd: string): Promise<any> {
+    await stopClient()
     client = new AcpClient()
 
     client.on('notification', (method, params) => {
@@ -138,8 +141,20 @@ app.whenReady().then(() => {
     })
 
     client.start(cwd)
-    const initResult = await client.initialize('kiro-desktop', app.getVersion())
-    const sessionResult = await client.newSession(cwd)
+    return client.initialize('kiro-desktop', app.getVersion())
+  }
+
+  ipcMain.handle('kiro:start', async (_e, cwd: string) => {
+    const initResult = await initClient(cwd)
+    const sessionResult = await client!.newSession(cwd)
+    setLastFolder(cwd)
+    return { initResult, sessionResult }
+  })
+
+  ipcMain.handle('kiro:openSession', async (_e, { cwd, sessionId }: { cwd: string; sessionId: string }) => {
+    const initResult = await initClient(cwd)
+    const sessionResult = await client!.loadSession(cwd, sessionId)
+    setLastFolder(cwd)
     return { initResult, sessionResult }
   })
 
@@ -149,6 +164,11 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('kiro:cancel', () => client?.cancel())
+
+  ipcMain.handle('kiro:setModel', async (_e, modelId: string) => {
+    if (!client) throw new Error('Session not started')
+    return client.setModel(modelId)
+  })
 
   ipcMain.handle('kiro:permissionResponse', (_e, { id, optionId }: { id: number; optionId: string }) => {
     const resolve = pendingPermissions.get(id)
@@ -175,6 +195,14 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('kiro:getDefaultFolder', () => {
+    const dir = join(homedir(), 'projects', 'kiro')
+    mkdirSync(dir, { recursive: true })
+    return dir
+  })
+
+  ipcMain.handle('kiro:getStartupFolder', () => {
+    const last = getLastFolder()
+    if (last && existsSync(last)) return last
     const dir = join(homedir(), 'projects', 'kiro')
     mkdirSync(dir, { recursive: true })
     return dir

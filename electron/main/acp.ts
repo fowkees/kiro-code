@@ -41,9 +41,14 @@ export class AcpClient extends EventEmitter {
     })
   }
 
-  stop(): void {
-    this.proc?.kill()
-    this.proc = null
+  stop(): Promise<void> {
+    const proc = this.proc
+    if (!proc) return Promise.resolve()
+    return new Promise((resolve) => {
+      proc.once('exit', () => resolve())
+      proc.kill()
+      setTimeout(resolve, 3000)
+    })
   }
 
   private onData(chunk: string): void {
@@ -126,12 +131,23 @@ export class AcpClient extends EventEmitter {
     return result
   }
 
+  async loadSession(cwd: string, sessionId: string): Promise<any> {
+    const result = await this.request('session/load', { sessionId, cwd, mcpServers: [] })
+    this.sessionId = sessionId
+    return result
+  }
+
   async prompt(parts: any[]): Promise<any> {
     if (!this.sessionId) throw new Error('No active session')
     return this.request('session/prompt', {
       sessionId: this.sessionId,
       prompt: parts
     })
+  }
+
+  async setModel(modelId: string): Promise<any> {
+    if (!this.sessionId) throw new Error('No active session')
+    return this.request('session/set_model', { sessionId: this.sessionId, modelId })
   }
 
   cancel(): void {
